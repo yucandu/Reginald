@@ -668,9 +668,22 @@ void parseLinescore() {
   // Add base runner parsing
   JsonObject offense = doc["liveData"]["linescore"]["offense"];
   if (!offense.isNull()) {
-    firstBase = offense["first"] | false;
-    secondBase = offense["second"] | false;
-    thirdBase = offense["third"] | false;
+    // If the base object exists and is not null, there's a runner on that base
+    firstBase = !offense["first"].isNull();
+    secondBase = !offense["second"].isNull();
+    thirdBase = !offense["third"].isNull();
+    
+    // Debug output
+    Serial.printf("Base runners - 1st: %s, 2nd: %s, 3rd: %s\n", 
+                  firstBase ? "YES" : "NO",
+                  secondBase ? "YES" : "NO", 
+                  thirdBase ? "YES" : "NO");
+  } else {
+    // No offense object means no runners
+    firstBase = false;
+    secondBase = false;
+    thirdBase = false;
+    Serial.println("No offense object found - no base runners");
   }
 }
 
@@ -872,8 +885,31 @@ void parseCurrentPlay() {
 }
 
 void displayGameInfo() {
-  img.fillSprite(0x079f);
-  
+  //img.fillSprite(0x079f);
+    if(!LittleFS.begin()){
+    Serial.println("LittleFS Mount Failed");
+    return;
+    }
+
+    File file = LittleFS.open("/mlbbackground.jpg", "r");
+    if (!file) {
+        Serial.println("Failed to open file");
+        return;
+    }
+
+    size_t fileSize = file.size();
+    uint8_t* buffer = (uint8_t*)ps_malloc(fileSize);
+    if (!buffer) {
+        Serial.println("Failed to allocate memory");
+        file.close();
+        return;
+    }
+
+    file.read(buffer, fileSize);
+    file.close();
+
+    img.drawJpg(buffer, fileSize, 0, 0);
+    free(buffer);
   // Get team colors
   uint16_t awayBgColor = TEAM_BG_COLORS.count(awayTeamID) ? TEAM_BG_COLORS[awayTeamID] : COLORS::BLACK;
   uint16_t awayTextColor = TEAMS_TEXT_COLORS.count(awayTeamID) ? TEAMS_TEXT_COLORS[awayTeamID] : TFT_WHITE;
@@ -975,10 +1011,10 @@ void displayGameInfo() {
       int y = baseY + i * 14;
 
       // Draw sprite
-      sprite[i].pushSprite(&tft, baseX, y, 0x079f);
+      sprite[i].pushSprite(&img, baseX, y, TFT_TRANSPARENT);
 
       // Draw label
-      img.setTextColor(TFT_WHITE, 0x079f);  // White on black background
+      img.setTextColor(TFT_WHITE);  // White on black background
       img.setTextSize(1);
       img.setCursor(baseX + 14, y+1);         // slight vertical offset for alignment
       img.print(labels[i]);
@@ -1045,7 +1081,7 @@ void displayGameInfo() {
   img.setCursor(160, 300);
   img.printf("%d OUT", outCount);
   
-  img.pushSprite(&tft, 0, 0, 0x079f);
+  img.pushSprite(0, 0);
 }
 
 int getSpriteIndex(const String& typeCode) {
@@ -1076,31 +1112,9 @@ void doMLB() {
     }
 
     
-    if(!LittleFS.begin()){
-    Serial.println("LittleFS Mount Failed");
-    return;
-    }
 
-    File file = LittleFS.open("/mlbbackground.jpg", "r");
-    if (!file) {
-        Serial.println("Failed to open file");
-        return;
-    }
-
-    size_t fileSize = file.size();
-    uint8_t* buffer = (uint8_t*)malloc(fileSize);
-    if (!buffer) {
-        Serial.println("Failed to allocate memory");
-        file.close();
-        return;
-    }
-
-    file.read(buffer, fileSize);
-    file.close();
-
-    tft.drawJpg(buffer, fileSize, 0, 0);
     displayGameInfo();
-    free(buffer);
+    
     Serial.print("Current time: ");
     float newTime = millis() / 1000.0;
     Serial.println(newTime);
@@ -1233,8 +1247,13 @@ void setup() {
   tft.print(&timeinfo, "%Y-%m-%d %H:%M:%S");
   delay(1000);
   
-  img.setColorDepth(8);  // Set color depth to 16 bits (RGB565)
-  img.createSprite(240, 320);  // Create a sprite with the same size as the tft
+  img.setColorDepth(16);  // Set color depth to 16 bits (RGB565)
+  img.setPsram(true); 
+  if (!img.createSprite(240, 320)) {
+    tft.println("Failed to create sprite");
+    while(1){ArduinoOTA.handle();}
+  }
+  
 
   //audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   //audio.setVolume(21); // 0...21
