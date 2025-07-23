@@ -94,8 +94,8 @@ int getSpriteIndex(const String& typeCode);
 
 #define BTN_7 3
 
-#define BTN_SETCH 41
-#define BTN_MINMAX 37
+#define BTN_SETCH 37
+#define BTN_MINMAX 41
 
 #define LED_PIN     48   // Change this if needed
 #define BKL_PIN    8   // Backlight pin, if used
@@ -1067,6 +1067,8 @@ void displayGameInfo() {
     img.print("Top ");
   } else if (inningState == "Bottom") {
     img.print("Bot ");
+  } else if (inningState == "Middle") {
+    img.print("Mid ");
   } else if (inningState.length() > 0) {
     img.printf("%s ", inningState.c_str());
   }
@@ -1210,7 +1212,7 @@ void setup() {
   }
 
   // 7. Grey square
-  sprite[6].fillRect(0, 0, 12, 12, TFT_LIGHTGREY);
+  sprite[6].fillRect(2, 2, 8, 8, TFT_LIGHTGREY);
 
   while (WiFi.status() != WL_CONNECTED) {
     tft.print(".");
@@ -1258,7 +1260,7 @@ void setup() {
   //audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT);
   //audio.setVolume(21); // 0...21
   
-  if (!digitalRead(BTN_SETCH)) {
+  if (!digitalRead(BTN_MINMAX)) {
     while(1){ArduinoOTA.handle();}
   }
   doMLB();
@@ -1270,7 +1272,15 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     ArduinoOTA.handle();
   }  //don't do Blynk unless wifi
-  every(30000){
+  every(10000){
+    doMLB();
+  }
+  if (!digitalRead(BTN_SETCH)) {
+    Serial.println("Button SET/CH pressed");
+    // Handle button SET/CH action
+    while (!digitalRead(BTN_SETCH)) {
+      delay(100);
+    }
     doMLB();
   }
   
